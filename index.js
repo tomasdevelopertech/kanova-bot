@@ -5,8 +5,6 @@ require('dotenv').config();
 const app = express();
 app.use(express.json());
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-
 const SYSTEM_PROMPT = `
 Eres el asistente virtual de ventas de Kanova Tecnología.
 Atiendes a clientes de Facebook Marketplace, Instagram y WhatsApp.
@@ -23,34 +21,61 @@ Reglas de respuesta:
 4. Para concretar pago o compra, remite a WhatsApp.
 `;
 
-// Declaración correcta de systemInstruction para Gemini 1.5
-const model = genAI.getGenerativeModel({ 
-  model: "gemini-1.5-flash",
-  systemInstruction: SYSTEM_PROMPT
-});
-
 app.post('/webhook', async (req, res) => {
-  try {
-    const { message, senderId } = req.body;
+  const { message } = req.body;
 
-    if (!message) {
-      return res.status(400).send("No message received");
-    }
+  // 1. Validar que la petición contenga mensaje
+  if (!message) {
+    return res.status(400).json({ status: "error", detail: "El campo 'message' es requerido en el JSON." });
+  }
+
+  // 2. Validar presencia de la API Key
+  if (!process.env.GEMINI_API_KEY) {
+    return res.status(500).json({ status: "error", detail: "Falta configurar GEMINI_API_KEY en Render." });
+  }
+
+  const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+
+  // Intentar primero con gemini-1.5-flash-latest
+  try {
+    const model = genAI.getGenerativeModel({ 
+      model: "gemini-1.5-flash-latest",
+      systemInstruction: SYSTEM_PROMPT
+    });
 
     const result = await model.generateContent(message);
     const botResponse = result.response.text();
 
-    res.status(200).json({ status: "success", reply: botResponse });
+    return res.status(200).json({ status: "success", reply: botResponse });
+
   } catch (error) {
-    console.error("Error procesando mensaje:", error);
-    res.status(500).send("Internal Server Error");
+    console.error("Fallo gemini-1.5-flash-latest, reintentando con gemini-2.0-flash:", error.message);
+
+    // Fallback automático a gemini-2.0-flash
+    try {
+      const fallbackModel = genAI.getGenerativeModel({ 
+        model: "gemini-2.0-flash",
+        systemInstruction: SYSTEM_PROMPT
+      });
+
+      const fallbackResult = await fallbackModel.generateContent(message);
+      const fallbackResponse = fallbackResult.response.text();
+
+      return res.status(200).json({ status: "success", reply: fallbackResponse });
+
+    } catch (fallbackError) {
+      console.error("Error definitivo en Gemini:", fallbackError.message);
+      return res.status(500).json({ status: "error", detail: fallbackError.message });
+    }
   }
 });
 
+// Ruta raíz para verificación
 app.get('/', (req, res) => {
   res.send('🤖 Bot Server Kanova en línea y listo.');
 });
 
+// Inicio del servidor
 const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => {
   console.log(`Servidor ejecutándose en el puerto ${PORT}`);
