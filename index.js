@@ -37,9 +37,9 @@ app.post('/webhook', async (req, res) => {
       return res.status(200).json({ status: 'error', detail: 'Falta configurar GEMINI_API_KEY en Render.' });
     }
 
-    // Usando el nombre oficial exacto del modelo
+    // Especificación directa de la ruta del modelo para la API REST v1beta
     const model = genAI.getGenerativeModel({ 
-      model: 'gemini-1.5-flash',
+      model: 'models/gemini-1.5-flash',
       systemInstruction: SYSTEM_PROMPT
     });
 
