@@ -6,7 +6,6 @@ const app = express();
 app.use(express.json());
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
 const SYSTEM_PROMPT = `
 Eres el asistente virtual de ventas de Kanova Tecnología.
@@ -24,6 +23,12 @@ Reglas de respuesta:
 4. Para concretar pago o compra, remite a WhatsApp.
 `;
 
+// Declaración correcta de systemInstruction para Gemini 1.5
+const model = genAI.getGenerativeModel({ 
+  model: "gemini-1.5-flash",
+  systemInstruction: SYSTEM_PROMPT
+});
+
 app.post('/webhook', async (req, res) => {
   try {
     const { message, senderId } = req.body;
@@ -32,11 +37,7 @@ app.post('/webhook', async (req, res) => {
       return res.status(400).send("No message received");
     }
 
-    const chat = model.startChat({
-      history: [{ role: "user", parts: [{ text: SYSTEM_PROMPT }] }]
-    });
-
-    const result = await chat.sendMessage(message);
+    const result = await model.generateContent(message);
     const botResponse = result.response.text();
 
     res.status(200).json({ status: "success", reply: botResponse });
