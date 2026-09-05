@@ -37,9 +37,9 @@ app.post('/webhook', async (req, res) => {
       return res.status(200).json({ status: 'error', detail: 'Falta configurar GEMINI_API_KEY en Render.' });
     }
 
-    // Usando el modelo oficial activo gemini-2.5-flash
+    // Usando el alias oficial más compatible
     const model = genAI.getGenerativeModel({ 
-      model: 'gemini-2.5-flash',
+      model: 'gemini-1.5-flash-latest',
       systemInstruction: SYSTEM_PROMPT
     });
 
@@ -50,7 +50,6 @@ app.post('/webhook', async (req, res) => {
 
   } catch (error) {
     console.error('Error procesando mensaje:', error.message);
-    // Devuelve respuesta en JSON con código 200 para que PowerShell muestre el detalle explícito sin bloquearse con HTTP 500
     return res.status(200).json({ status: 'error', detail: error.message });
   }
 });
