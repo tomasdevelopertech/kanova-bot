@@ -6,7 +6,6 @@ const app = express();
 app.use(express.json());
 
 const PORT = process.env.PORT || 8080;
-
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
 
 const SYSTEM_PROMPT = `
@@ -37,19 +36,34 @@ app.post('/webhook', async (req, res) => {
       return res.status(200).json({ status: 'error', detail: 'Falta configurar GEMINI_API_KEY en Render.' });
     }
 
-    // Instancia del modelo con la versión estándar compatible
-    const model = genAI.getGenerativeModel({ 
-      model: 'gemini-1.5-flash',
-      systemInstruction: SYSTEM_PROMPT
-    });
+    // Lista de modelos a probar en orden de prioridad
+    const modelsToTry = ['gemini-1.5-flash-latest', 'gemini-1.5-pro', 'gemini-pro'];
+    let botResponse = null;
+    let lastError = null;
 
-    const result = await model.generateContent(message);
-    const botResponse = result.response.text();
+    for (const modelName of modelsToTry) {
+      try {
+        const model = genAI.getGenerativeModel({ 
+          model: modelName,
+          systemInstruction: SYSTEM_PROMPT
+        });
+
+        const result = await model.generateContent(message);
+        botResponse = result.response.text();
+        break; // Si el modelo responde con éxito, salimos del ciclo
+      } catch (err) {
+        lastError = err.message;
+      }
+    }
+
+    if (!botResponse) {
+      return res.status(200).json({ status: 'error', detail: `Ningún modelo respondió. Último error: ${lastError}` });
+    }
 
     return res.status(200).json({ status: 'success', reply: botResponse });
 
   } catch (error) {
-    console.error('Error procesando mensaje:', error.message);
+    console.error('Error general:', error.message);
     return res.status(200).json({ status: 'error', detail: error.message });
   }
 });
